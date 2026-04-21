@@ -25,8 +25,7 @@ uv run python src/data/preprocess_air_data.py
 Za validacijo podatkov z Great Expectations:
 
 ```powershell
-Set-Location gx
-..\.venv\Scripts\python.exe run_checkpoint.py
+uv run python gx/run_checkpoint.py
 ```
 
 Za testiranje podatkov z Evidently:

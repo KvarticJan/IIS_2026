@@ -21,7 +21,7 @@ stages:
           persist: true
 
   validate:
-    cmd: cd gx && ..\.venv\Scripts\python.exe run_checkpoint.py
+    cmd: uv run python gx/run_checkpoint.py
     deps:
       - gx/run_checkpoint.py
       - gx/great_expectations.yml
