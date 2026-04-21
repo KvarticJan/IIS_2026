@@ -13,3 +13,6 @@ Thumbs.db
 .env.*
 .dvc/config.local
 /data
+/models
+/reports/data_testing
+/reports/model_training

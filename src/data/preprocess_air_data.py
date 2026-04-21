@@ -3,10 +3,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from lxml import etree as ET
+import yaml
 
 RAW_DATA_PATH = Path("data/raw/air/air_data.xml")
 PREPROCESSED_DIR = Path("data/preprocessed/air")
 CSV_COLUMNS = ["date_to", "PM10", "PM2.5"]
+PARAMS_PATH = Path("params.yaml")
 
 
 def _normalize_measurement(value: str | None) -> float | str:
@@ -17,6 +19,11 @@ def _normalize_measurement(value: str | None) -> float | str:
     if value == "<2":
         return 2.0
     return value
+
+
+def _load_station_filter() -> str:
+    params = yaml.safe_load(PARAMS_PATH.read_text(encoding="utf-8"))
+    return str(params.get("preprocess", {}).get("station", "all"))
 
 
 def preprocess_air_data() -> None:
@@ -33,6 +40,10 @@ def preprocess_air_data() -> None:
     print(f"Preparation Date: {root.findtext('datum_priprave')}")
 
     station_codes = sorted(set(tree.xpath("//postaja/@sifra")))
+    station_filter = _load_station_filter()
+    if station_filter.lower() != "all":
+        station_codes = [station_code for station_code in station_codes if station_code == station_filter]
+
     print(f"Processing {len(station_codes)} stations")
 
     for station_code in station_codes:

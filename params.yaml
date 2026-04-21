@@ -1,0 +1,16 @@
+fetch:
+  url: "https://www.arso.gov.si/xml/zrak/ones_zrak_urni_podatki_7dni.xml"
+
+preprocess:
+  station: "all"
+
+train:
+  station: "E410"
+  test_size: 24
+  random_state: 42
+  window_size: 24
+  target_col: "PM10"
+  epochs: 8
+  batch_size: 16
+  validation_split: 0.2
+  patience: 2

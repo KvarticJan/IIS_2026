@@ -10,7 +10,7 @@ Za namestitev odvisnosti in pripravo okolja:
 python -m uv sync
 ```
 
-Za zajem svezi podatkov:
+Za zajem svezih podatkov:
 
 ```powershell
 python -m uv run python src/data/fetch_air_data.py
@@ -22,14 +22,65 @@ Za predprocesiranje podatkov za vse merilne postaje:
 python -m uv run python src/data/preprocess_air_data.py
 ```
 
+Za validacijo podatkov z Great Expectations:
+
+```powershell
+Set-Location gx
+..\.venv\Scripts\python.exe run_checkpoint.py
+```
+
+Za testiranje podatkov z Evidently:
+
+```powershell
+python -m uv run python src/data/test_data.py
+```
+
+Za namensko osvezitev Evidently referenc, ce se je baseline legitimno spremenil:
+
+```powershell
+$env:EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE="1"
+python -m uv run python src/data/test_data.py
+Remove-Item Env:EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE
+```
+
+Za ucenje modela:
+
+```powershell
+python -m uv run python src/model/train.py
+```
+
 ## Struktura
 
 - `data/raw/air/air_data.xml`: surovi XML podatki iz ARSO
 - `data/preprocessed/air/*.csv`: predprocesirani podatki po merilnih postajah
-- `src/data/`: skripte za zajem in obdelavo podatkov
+- `data/reference/air/*.csv`: referencni podatki za Evidently drift teste
+- `gx/`: Great Expectations kontekst, expectation suite-i in data docs
+- `models/`: nauceni modeli in serializirani preprocessing pipeline-i
+- `reports/`: Evidently in model evaluation porocila
+- `src/data/`: skripte za zajem, obdelavo, validacijo in testiranje podatkov
+- `src/model/`: skripte za pripravo casovnih oken in ucenje modela
 - `.github/workflows/`: GitHub Actions poteki dela
 
 ## DVC
 
-DVC je inicializiran in podatki so pripravljeni za verzioniranje z `dvc add data`.
-Oddaljeni DagsHub remote in DVC cevovodi (`dvc.yaml`) se dodajo v naslednjem koraku.
+Projekt uporablja DVC pipeline:
+
+- `fetch`: zajem surovih ARSO podatkov
+- `preprocess`: priprava CSV datotek za vse merilne postaje
+- `validate`: Great Expectations validacija
+- `test_data`: Evidently drift testiranje
+- `train`: ucenje LSTM modela za izbrano postajo
+
+Za zagon celotnega cevovoda:
+
+```powershell
+python -m dvc repro
+```
+
+Za prvi osvezitveni zagon po vecji spremembi podatkov lahko pred `dvc repro` zacasno nastavis:
+
+```powershell
+$env:EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE="1"
+python -m dvc repro test_data train
+Remove-Item Env:EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE
+```

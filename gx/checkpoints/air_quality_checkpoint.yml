@@ -1,0 +1,185 @@
+name: air_quality_checkpoint
+config_version: 1.0
+template_name:
+module_name: great_expectations.checkpoint
+class_name: Checkpoint
+run_name_template:
+expectation_suite_name:
+batch_request: {}
+action_list:
+  - name: store_validation_result
+    action:
+      class_name: StoreValidationResultAction
+  - name: store_evaluation_params
+    action:
+      class_name: StoreEvaluationParametersAction
+  - name: update_data_docs
+    action:
+      class_name: UpdateDataDocsAction
+evaluation_parameters: {}
+runtime_configuration: {}
+validations:
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E403
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E404
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E405
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E407
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E408
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E409
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E410
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E411
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E412
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E413
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E414
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E415
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E417
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E418
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E419
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E420
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E421
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E423
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E424
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E801
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E802
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E803
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+  - batch_request:
+      datasource_name: air_quality
+      data_asset_name: air_quality_data
+      options:
+        station: E804
+      batch_slice:
+    expectation_suite_name: air_quality_suite
+profilers: []
+ge_cloud_id:
+expectation_suite_ge_cloud_id:

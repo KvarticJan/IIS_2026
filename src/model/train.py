@@ -1,0 +1,230 @@
+import json
+import os
+import random
+import time
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
+import yaml
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler
+
+os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+
+import tensorflow as tf
+from tensorflow.keras.callbacks import EarlyStopping, LambdaCallback
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
+from tensorflow.keras.models import Sequential
+
+from preprocess import DatePreprocessor, SlidingWindowTransformer
+
+
+PARAMS_PATH = Path("params.yaml")
+PREPROCESSED_DIR = Path("data/preprocessed/air")
+MODELS_DIR = Path("models")
+REPORTS_DIR = Path("reports/model_training")
+
+
+def debug(message: str) -> None:
+    elapsed = time.strftime("%H:%M:%S")
+    print(f"[{elapsed}] {message}", flush=True)
+
+
+def build_model(input_shape: tuple[int, int]) -> Sequential:
+    debug(f"Building model for input shape {input_shape}")
+    model = Sequential()
+    model.add(Input(shape=input_shape))
+    model.add(LSTM(16, return_sequences=False))
+    model.add(Dropout(0.2))
+    model.add(Dense(1))
+    model.compile(optimizer="adam", loss="mean_squared_error", run_eagerly=True)
+    return model
+
+
+def _load_params() -> dict:
+    params = yaml.safe_load(PARAMS_PATH.read_text(encoding="utf-8"))
+    return params["train"]
+
+
+def _build_pipeline(target_col: str, window_size: int) -> Pipeline:
+    numeric_transformer = Pipeline(
+        [
+            ("fillna", SimpleImputer(strategy="mean")),
+            ("normalize", MinMaxScaler()),
+        ]
+    )
+
+    preprocess = ColumnTransformer(
+        [
+            ("numeric_transformer", numeric_transformer, [target_col]),
+        ]
+    )
+
+    return Pipeline(
+        [
+            ("preprocess", preprocess),
+            ("sliding_window_transformer", SlidingWindowTransformer(window_size)),
+        ]
+    )
+
+
+def _inverse_transform_targets(pipeline: Pipeline, values: np.ndarray) -> np.ndarray:
+    scaler = pipeline.named_steps["preprocess"].named_transformers_["numeric_transformer"].named_steps["normalize"]
+    return scaler.inverse_transform(values.reshape(-1, 1)).reshape(-1)
+
+
+def _save_metrics(metrics_path: Path, metrics: dict) -> None:
+    metrics_path.parent.mkdir(parents=True, exist_ok=True)
+    metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+
+
+def train_model() -> None:
+    start_time = time.perf_counter()
+    debug("Loading training parameters")
+    params = _load_params()
+    station = params["station"]
+    test_size = int(params["test_size"])
+    random_state = int(params["random_state"])
+    window_size = int(params["window_size"])
+    target_col = params["target_col"]
+    epochs = int(params["epochs"])
+    batch_size = int(params["batch_size"])
+    validation_split = float(params["validation_split"])
+    patience = int(params["patience"])
+
+    debug("Setting reproducibility configuration")
+    os.environ["PYTHONHASHSEED"] = str(random_state)
+    random.seed(random_state)
+    np.random.seed(random_state)
+    tf.keras.utils.set_random_seed(random_state)
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+    tf.config.threading.set_intra_op_parallelism_threads(1)
+
+    debug("Ensuring output directories exist")
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    dataset_path = PREPROCESSED_DIR / f"{station}.csv"
+    debug(f"Loading dataset from {dataset_path}")
+    df = pd.read_csv(dataset_path)
+    df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
+
+    debug("Applying date preprocessing and hourly alignment")
+    date_preprocessor = DatePreprocessor("date_to")
+    df = date_preprocessor.fit_transform(df)
+    debug(f"Dataset shape after date preprocessing: {df.shape}")
+
+    minimum_rows = window_size + test_size + 1
+    if len(df) < minimum_rows:
+        raise ValueError(
+            f"Dataset for {station} is too small for training. Need at least {minimum_rows} rows, got {len(df)}."
+        )
+
+    df_train = df.iloc[:-test_size].copy()
+    df_test = df.iloc[-(test_size + window_size) :].copy()
+
+    debug("Building preprocessing pipeline")
+    pipeline = _build_pipeline(target_col=target_col, window_size=window_size)
+    debug("Transforming train/test splits into sliding windows")
+    X_train, y_train = pipeline.fit_transform(df_train)
+    X_test, y_test = pipeline.transform(df_test)
+
+    debug(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
+    debug(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
+
+    input_shape = (X_train.shape[1], X_train.shape[2])
+    model = build_model(input_shape)
+    early_stopping = EarlyStopping(monitor="val_loss", patience=patience, restore_best_weights=True)
+    epoch_debug = LambdaCallback(
+        on_epoch_begin=lambda epoch, logs: debug(f"Starting train epoch {epoch + 1}/{epochs}"),
+        on_epoch_end=lambda epoch, logs: debug(f"Finished train epoch {epoch + 1}/{epochs} with logs={logs}"),
+    )
+    debug("Starting first model.fit on training split")
+    model.fit(
+        X_train,
+        y_train,
+        epochs=epochs,
+        batch_size=batch_size,
+        validation_split=validation_split,
+        callbacks=[early_stopping, epoch_debug],
+        shuffle=False,
+        verbose=2,
+    )
+    debug("First model.fit completed")
+
+    debug("Running test-set prediction")
+    y_pred = model.predict(X_test, verbose=0).reshape(-1)
+    y_test_inverse = _inverse_transform_targets(pipeline, y_test.reshape(-1))
+    y_pred_inverse = _inverse_transform_targets(pipeline, y_pred)
+
+    mse = mean_squared_error(y_test_inverse, y_pred_inverse)
+    mae = mean_absolute_error(y_test_inverse, y_pred_inverse)
+    rmse = float(np.sqrt(mse))
+    debug(f"Test MAE: {mae}")
+    debug(f"Test MSE: {mse}")
+    debug(f"Test RMSE: {rmse}")
+
+    debug("Preparing full-dataset training data")
+    X_full, y_full = pipeline.fit_transform(df)
+    tf.keras.backend.clear_session()
+    model_full = build_model((X_full.shape[1], X_full.shape[2]))
+    full_early_stopping = EarlyStopping(monitor="val_loss", patience=patience, restore_best_weights=True)
+    full_epoch_debug = LambdaCallback(
+        on_epoch_begin=lambda epoch, logs: debug(f"Starting full epoch {epoch + 1}/{epochs}"),
+        on_epoch_end=lambda epoch, logs: debug(f"Finished full epoch {epoch + 1}/{epochs} with logs={logs}"),
+    )
+    debug("Starting second model.fit on full dataset")
+    model_full.fit(
+        X_full,
+        y_full,
+        epochs=epochs,
+        batch_size=batch_size,
+        validation_split=validation_split,
+        callbacks=[full_early_stopping, full_epoch_debug],
+        shuffle=False,
+        verbose=2,
+    )
+    debug("Second model.fit completed")
+
+    debug("Running full-dataset prediction")
+    y_pred_full = model_full.predict(X_full, verbose=0).reshape(-1)
+    y_full_inverse = _inverse_transform_targets(pipeline, y_full.reshape(-1))
+    y_pred_full_inverse = _inverse_transform_targets(pipeline, y_pred_full)
+
+    mse_full = mean_squared_error(y_full_inverse, y_pred_full_inverse)
+    mae_full = mean_absolute_error(y_full_inverse, y_pred_full_inverse)
+    rmse_full = float(np.sqrt(mse_full))
+    debug(f"Full dataset MAE: {mae_full}")
+    debug(f"Full dataset MSE: {mse_full}")
+    debug(f"Full dataset RMSE: {rmse_full}")
+
+    model_path = MODELS_DIR / f"model_{station}.keras"
+    pipeline_path = MODELS_DIR / f"pipeline_{station}.pkl"
+    metrics_path = REPORTS_DIR / f"{station}.json"
+
+    debug(f"Saving model to {model_path}")
+    model_full.save(model_path)
+    debug(f"Saving preprocessing pipeline to {pipeline_path}")
+    joblib.dump(pipeline, pipeline_path)
+    debug(f"Saving metrics to {metrics_path}")
+    _save_metrics(
+        metrics_path,
+        {
+            "station": station,
+            "target_col": target_col,
+            "duration_seconds": round(time.perf_counter() - start_time, 2),
+            "test": {"mae": mae, "mse": mse, "rmse": rmse},
+            "full": {"mae": mae_full, "mse": mse_full, "rmse": rmse_full},
+        },
+    )
+    debug(f"Training completed in {round(time.perf_counter() - start_time, 2)} seconds")
+
+
+if __name__ == "__main__":
+    train_model()

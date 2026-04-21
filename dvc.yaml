@@ -1,0 +1,66 @@
+stages:
+  fetch:
+    cmd: python -m uv run python src/data/fetch_air_data.py
+    deps:
+      - src/data/fetch_air_data.py
+    params:
+      - fetch.url
+    outs:
+      - data/raw/air/air_data.xml
+    always_changed: true
+
+  preprocess:
+    cmd: python -m uv run python src/data/preprocess_air_data.py
+    deps:
+      - src/data/preprocess_air_data.py
+      - data/raw/air/air_data.xml
+    params:
+      - preprocess.station
+    outs:
+      - data/preprocessed/air:
+          persist: true
+
+  validate:
+    cmd: cd gx && ..\.venv\Scripts\python.exe run_checkpoint.py
+    deps:
+      - gx/run_checkpoint.py
+      - gx/great_expectations.yml
+      - data/preprocessed/air
+    outs:
+      - gx/uncommitted:
+          persist: true
+
+  test_data:
+    cmd: python -m uv run python src/data/test_data.py
+    deps:
+      - src/data/test_data.py
+      - data/preprocessed/air
+    outs:
+      - data/reference/air:
+          persist: true
+      - reports/data_testing:
+          persist: true
+
+  train:
+    cmd: python -m uv run python src/model/train.py
+    deps:
+      - src/model/preprocess.py
+      - src/model/train.py
+      - data/preprocessed/air
+      - data/reference/air
+      - gx/uncommitted
+    params:
+      - train.station
+      - train.test_size
+      - train.random_state
+      - train.window_size
+      - train.target_col
+      - train.epochs
+      - train.batch_size
+      - train.validation_split
+      - train.patience
+    outs:
+      - models:
+          persist: true
+      - reports/model_training:
+          persist: true

@@ -1,25 +1,14 @@
-name: Fetch data on schedule
+name: Train model
 
 on:
   workflow_dispatch:
-    inputs:
-      refresh_reference:
-        description: "Refresh Evidently reference files if drift is detected"
-        required: true
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
-  schedule:
-    - cron: "0 0 * * *"
 
 permissions:
   contents: write
 
 jobs:
-  fetch_air:
-    name: Fetch, validate and test air data
+  train_model:
+    name: Train air quality model
     runs-on: ubuntu-latest
 
     steps:
@@ -50,20 +39,18 @@ jobs:
           dvc remote modify origin --local secret_access_key ${{ secrets.DAGSHUB_SECRET_ACCESS_KEY }}
           dvc pull
 
-      - name: Run DVC data pipeline
-        env:
-          EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE: ${{ inputs.refresh_reference == 'true' && '1' || '0' }}
-        run: dvc repro fetch preprocess validate test_data
+      - name: Run training pipeline
+        run: dvc repro train
 
       - name: Push DVC artifacts
         run: dvc push
 
-      - name: Commit data changes
+      - name: Commit model changes
         run: |
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git add dvc.lock
-          git commit -m "Update air data artifacts with GitHub Actions" || echo "No changes to commit"
+          git commit -m "Train model with GitHub Actions" || echo "No changes to commit"
 
       - name: Push changes
         uses: ad-m/github-push-action@master
