@@ -82,7 +82,7 @@ stages:
       size: 80074199
       nfiles: 23
   train:
-    cmd: python -m uv run python src/model/train.py
+    cmd: uv run python src/model/train.py
     deps:
     - path: data/preprocessed/air
       hash: md5
@@ -101,12 +101,12 @@ stages:
       nfiles: 162
     - path: src/model/preprocess.py
       hash: md5
-      md5: 7d5c556b113b9ca3fa4d4f1de4bf4e99
-      size: 1409
+      md5: 484f66f5642fe83bd3f79f34326cfd1a
+      size: 1369
     - path: src/model/train.py
       hash: md5
-      md5: f7ae756c470bc68d3c8cf2f827ffd8ec
-      size: 8640
+      md5: 69301f3dc1842d9af9f077f276149316
+      size: 8410
     params:
       params.yaml:
         train.batch_size: 16
@@ -121,11 +121,11 @@ stages:
     outs:
     - path: models
       hash: md5
-      md5: 5f343cf711c117f17728c5ee6081b643.dir
-      size: 42768
+      md5: 1bce8cb617fd95fcad55eef864ee18ca.dir
+      size: 42782
       nfiles: 2
     - path: reports/model_training
       hash: md5
-      md5: e0b334da9489b539d98790d9386ade0d.dir
-      size: 306
+      md5: 0751b4804f9720a39cd34194b5fb169e.dir
+      size: 293
       nfiles: 1
