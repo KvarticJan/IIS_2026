@@ -40,7 +40,7 @@ jobs:
           dvc pull
 
       - name: Run training pipeline
-        run: dvc repro train
+        run: dvc repro --single-item train
 
       - name: Push DVC artifacts
         run: dvc push
