@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 import great_expectations as gx
+import yaml
 
 
 CONTEXT_ROOT = Path(__file__).resolve().parent
@@ -12,7 +13,19 @@ SUITE_NAME = "air_quality_suite"
 CHECKPOINT_NAME = "air_quality_checkpoint"
 
 
+def _sync_datasource_base_directory() -> None:
+    config_path = CONTEXT_ROOT / "great_expectations.yml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+
+    fluent_datasources = config.setdefault("fluent_datasources", {})
+    datasource = fluent_datasources.setdefault(DATASOURCE_NAME, {})
+    datasource["base_directory"] = str(PREPROCESSED_DIR.resolve())
+
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+
 def _get_context():
+    _sync_datasource_base_directory()
     return gx.get_context(context_root_dir=str(CONTEXT_ROOT))
 
 
