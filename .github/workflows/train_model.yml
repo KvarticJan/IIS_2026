@@ -40,7 +40,17 @@ jobs:
           dvc pull
 
       - name: Run training pipeline
-        run: dvc repro --single-item train
+        env:
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+        run: |
+          if [ -n "${MLFLOW_TRACKING_USERNAME}" ] && [ -n "${MLFLOW_TRACKING_PASSWORD}" ]; then
+            export MLFLOW_TRACKING_URI="https://dagshub.com/KvarticJan/IIS_2026.mlflow"
+            echo "Using DagsHub MLflow tracking."
+          else
+            echo "MLflow secrets are missing. Falling back to local tracking."
+          fi
+          dvc repro --single-item train
 
       - name: Push DVC artifacts
         run: dvc push

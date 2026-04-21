@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import joblib
+import mlflow
 import numpy as np
 import pandas as pd
 import yaml
@@ -29,6 +30,7 @@ PARAMS_PATH = Path("params.yaml")
 PREPROCESSED_DIR = Path("data/preprocessed/air")
 MODELS_DIR = Path("models")
 REPORTS_DIR = Path("reports/model_training")
+MLRUNS_DIR = Path("mlruns")
 
 
 def debug(message: str) -> None:
@@ -48,8 +50,27 @@ def build_model(input_shape: tuple[int, int]) -> Sequential:
 
 
 def _load_params() -> dict:
-    params = yaml.safe_load(PARAMS_PATH.read_text(encoding="utf-8"))
-    return params["train"]
+    return yaml.safe_load(PARAMS_PATH.read_text(encoding="utf-8"))
+
+
+def _configure_mlflow(config: dict, station: str) -> bool:
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "").strip()
+    username = os.getenv("MLFLOW_TRACKING_USERNAME", "").strip()
+    password = os.getenv("MLFLOW_TRACKING_PASSWORD", "").strip()
+    experiment_config = config.get("experiment_tracking", {})
+
+    if not tracking_uri:
+        remote_uri = str(experiment_config.get("tracking_uri", "")).strip()
+        if remote_uri and username and password:
+            tracking_uri = remote_uri
+        else:
+            tracking_uri = MLRUNS_DIR.resolve().as_uri()
+
+    experiment_name = str(experiment_config.get("experiment_name", "IIS_2026_train"))
+    debug(f"Configuring MLflow tracking URI: {tracking_uri}")
+    mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_experiment(experiment_name)
+    return tracking_uri.startswith("http://") or tracking_uri.startswith("https://")
 
 
 def _build_pipeline(target_col: str, window_size: int) -> Pipeline:
@@ -87,7 +108,8 @@ def _save_metrics(metrics_path: Path, metrics: dict) -> None:
 def train_model() -> None:
     start_time = time.perf_counter()
     debug("Loading training parameters")
-    params = _load_params()
+    config = _load_params()
+    params = config["train"]
     station = params["station"]
     test_size = int(params["test_size"])
     random_state = int(params["random_state"])
@@ -109,121 +131,155 @@ def train_model() -> None:
     debug("Ensuring output directories exist")
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    MLRUNS_DIR.mkdir(parents=True, exist_ok=True)
+    uses_remote_mlflow = _configure_mlflow(config, station)
 
-    dataset_path = PREPROCESSED_DIR / f"{station}.csv"
-    debug(f"Loading dataset from {dataset_path}")
-    df = pd.read_csv(dataset_path)
-    df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
-
-    debug("Applying date preprocessing and hourly alignment")
-    date_preprocessor = DatePreprocessor("date_to")
-    df = date_preprocessor.fit_transform(df)
-    debug(f"Dataset shape after date preprocessing: {df.shape}")
-
-    minimum_rows = window_size + test_size + 1
-    if len(df) < minimum_rows:
-        raise ValueError(
-            f"Dataset for {station} is too small for training. Need at least {minimum_rows} rows, got {len(df)}."
+    with mlflow.start_run(run_name=f"train_{station}"):
+        mlflow.log_params(
+            {
+                "station": station,
+                "test_size": test_size,
+                "random_state": random_state,
+                "window_size": window_size,
+                "target_col": target_col,
+                "epochs": epochs,
+                "batch_size": batch_size,
+                "validation_split": validation_split,
+                "patience": patience,
+                "tracking_mode": "remote" if uses_remote_mlflow else "local",
+            }
         )
 
-    df_train = df.iloc[:-test_size].copy()
-    df_test = df.iloc[-(test_size + window_size) :].copy()
+        dataset_path = PREPROCESSED_DIR / f"{station}.csv"
+        debug(f"Loading dataset from {dataset_path}")
+        df = pd.read_csv(dataset_path)
+        df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
 
-    debug("Building preprocessing pipeline")
-    pipeline = _build_pipeline(target_col=target_col, window_size=window_size)
-    debug("Transforming train/test splits into sliding windows")
-    X_train, y_train = pipeline.fit_transform(df_train)
-    X_test, y_test = pipeline.transform(df_test)
+        debug("Applying date preprocessing and hourly alignment")
+        date_preprocessor = DatePreprocessor("date_to")
+        df = date_preprocessor.fit_transform(df)
+        debug(f"Dataset shape after date preprocessing: {df.shape}")
+        mlflow.log_metric("dataset_rows", float(len(df)))
 
-    debug(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
-    debug(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
+        minimum_rows = window_size + test_size + 1
+        if len(df) < minimum_rows:
+            raise ValueError(
+                f"Dataset for {station} is too small for training. Need at least {minimum_rows} rows, got {len(df)}."
+            )
 
-    input_shape = (X_train.shape[1], X_train.shape[2])
-    model = build_model(input_shape)
-    early_stopping = EarlyStopping(monitor="val_loss", patience=patience, restore_best_weights=True)
-    epoch_debug = LambdaCallback(
-        on_epoch_begin=lambda epoch, logs: debug(f"Starting train epoch {epoch + 1}/{epochs}"),
-        on_epoch_end=lambda epoch, logs: debug(f"Finished train epoch {epoch + 1}/{epochs} with logs={logs}"),
-    )
-    debug("Starting first model.fit on training split")
-    model.fit(
-        X_train,
-        y_train,
-        epochs=epochs,
-        batch_size=batch_size,
-        validation_split=validation_split,
-        callbacks=[early_stopping, epoch_debug],
-        shuffle=False,
-        verbose=2,
-    )
-    debug("First model.fit completed")
+        df_train = df.iloc[:-test_size].copy()
+        df_test = df.iloc[-(test_size + window_size) :].copy()
 
-    debug("Running test-set prediction")
-    y_pred = model.predict(X_test, verbose=0).reshape(-1)
-    y_test_inverse = _inverse_transform_targets(pipeline, y_test.reshape(-1))
-    y_pred_inverse = _inverse_transform_targets(pipeline, y_pred)
+        debug("Building preprocessing pipeline")
+        pipeline = _build_pipeline(target_col=target_col, window_size=window_size)
+        debug("Transforming train/test splits into sliding windows")
+        X_train, y_train = pipeline.fit_transform(df_train)
+        X_test, y_test = pipeline.transform(df_test)
 
-    mse = mean_squared_error(y_test_inverse, y_pred_inverse)
-    mae = mean_absolute_error(y_test_inverse, y_pred_inverse)
-    rmse = float(np.sqrt(mse))
-    debug(f"Test MAE: {mae}")
-    debug(f"Test MSE: {mse}")
-    debug(f"Test RMSE: {rmse}")
+        debug(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
+        debug(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
+        mlflow.log_params(
+            {
+                "train_samples": int(X_train.shape[0]),
+                "test_samples": int(X_test.shape[0]),
+                "input_timesteps": int(X_train.shape[1]),
+                "input_features": int(X_train.shape[2]),
+            }
+        )
 
-    debug("Preparing full-dataset training data")
-    X_full, y_full = pipeline.fit_transform(df)
-    tf.keras.backend.clear_session()
-    model_full = build_model((X_full.shape[1], X_full.shape[2]))
-    full_early_stopping = EarlyStopping(monitor="val_loss", patience=patience, restore_best_weights=True)
-    full_epoch_debug = LambdaCallback(
-        on_epoch_begin=lambda epoch, logs: debug(f"Starting full epoch {epoch + 1}/{epochs}"),
-        on_epoch_end=lambda epoch, logs: debug(f"Finished full epoch {epoch + 1}/{epochs} with logs={logs}"),
-    )
-    debug("Starting second model.fit on full dataset")
-    model_full.fit(
-        X_full,
-        y_full,
-        epochs=epochs,
-        batch_size=batch_size,
-        validation_split=validation_split,
-        callbacks=[full_early_stopping, full_epoch_debug],
-        shuffle=False,
-        verbose=2,
-    )
-    debug("Second model.fit completed")
+        input_shape = (X_train.shape[1], X_train.shape[2])
+        model = build_model(input_shape)
+        early_stopping = EarlyStopping(monitor="val_loss", patience=patience, restore_best_weights=True)
+        epoch_debug = LambdaCallback(
+            on_epoch_begin=lambda epoch, logs: debug(f"Starting train epoch {epoch + 1}/{epochs}"),
+            on_epoch_end=lambda epoch, logs: debug(f"Finished train epoch {epoch + 1}/{epochs} with logs={logs}"),
+        )
+        debug("Starting first model.fit on training split")
+        model.fit(
+            X_train,
+            y_train,
+            epochs=epochs,
+            batch_size=batch_size,
+            validation_split=validation_split,
+            callbacks=[early_stopping, epoch_debug],
+            shuffle=False,
+            verbose=2,
+        )
+        debug("First model.fit completed")
 
-    debug("Running full-dataset prediction")
-    y_pred_full = model_full.predict(X_full, verbose=0).reshape(-1)
-    y_full_inverse = _inverse_transform_targets(pipeline, y_full.reshape(-1))
-    y_pred_full_inverse = _inverse_transform_targets(pipeline, y_pred_full)
+        debug("Running test-set prediction")
+        y_pred = model.predict(X_test, verbose=0).reshape(-1)
+        y_test_inverse = _inverse_transform_targets(pipeline, y_test.reshape(-1))
+        y_pred_inverse = _inverse_transform_targets(pipeline, y_pred)
 
-    mse_full = mean_squared_error(y_full_inverse, y_pred_full_inverse)
-    mae_full = mean_absolute_error(y_full_inverse, y_pred_full_inverse)
-    rmse_full = float(np.sqrt(mse_full))
-    debug(f"Full dataset MAE: {mae_full}")
-    debug(f"Full dataset MSE: {mse_full}")
-    debug(f"Full dataset RMSE: {rmse_full}")
+        mse = mean_squared_error(y_test_inverse, y_pred_inverse)
+        mae = mean_absolute_error(y_test_inverse, y_pred_inverse)
+        rmse = float(np.sqrt(mse))
+        debug(f"Test MAE: {mae}")
+        debug(f"Test MSE: {mse}")
+        debug(f"Test RMSE: {rmse}")
+        mlflow.log_metric("test_mae", mae)
+        mlflow.log_metric("test_mse", mse)
+        mlflow.log_metric("test_rmse", rmse)
 
-    model_path = MODELS_DIR / f"model_{station}.keras"
-    pipeline_path = MODELS_DIR / f"pipeline_{station}.pkl"
-    metrics_path = REPORTS_DIR / f"{station}.json"
+        debug("Preparing full-dataset training data")
+        X_full, y_full = pipeline.fit_transform(df)
+        tf.keras.backend.clear_session()
+        model_full = build_model((X_full.shape[1], X_full.shape[2]))
+        full_early_stopping = EarlyStopping(monitor="val_loss", patience=patience, restore_best_weights=True)
+        full_epoch_debug = LambdaCallback(
+            on_epoch_begin=lambda epoch, logs: debug(f"Starting full epoch {epoch + 1}/{epochs}"),
+            on_epoch_end=lambda epoch, logs: debug(f"Finished full epoch {epoch + 1}/{epochs} with logs={logs}"),
+        )
+        debug("Starting second model.fit on full dataset")
+        model_full.fit(
+            X_full,
+            y_full,
+            epochs=epochs,
+            batch_size=batch_size,
+            validation_split=validation_split,
+            callbacks=[full_early_stopping, full_epoch_debug],
+            shuffle=False,
+            verbose=2,
+        )
+        debug("Second model.fit completed")
 
-    debug(f"Saving model to {model_path}")
-    model_full.save(model_path)
-    debug(f"Saving preprocessing pipeline to {pipeline_path}")
-    joblib.dump(pipeline, pipeline_path)
-    debug(f"Saving metrics to {metrics_path}")
-    _save_metrics(
-        metrics_path,
-        {
+        debug("Running full-dataset prediction")
+        y_pred_full = model_full.predict(X_full, verbose=0).reshape(-1)
+        y_full_inverse = _inverse_transform_targets(pipeline, y_full.reshape(-1))
+        y_pred_full_inverse = _inverse_transform_targets(pipeline, y_pred_full)
+
+        mse_full = mean_squared_error(y_full_inverse, y_pred_full_inverse)
+        mae_full = mean_absolute_error(y_full_inverse, y_pred_full_inverse)
+        rmse_full = float(np.sqrt(mse_full))
+        debug(f"Full dataset MAE: {mae_full}")
+        debug(f"Full dataset MSE: {mse_full}")
+        debug(f"Full dataset RMSE: {rmse_full}")
+        mlflow.log_metric("full_mae", mae_full)
+        mlflow.log_metric("full_mse", mse_full)
+        mlflow.log_metric("full_rmse", rmse_full)
+
+        model_path = MODELS_DIR / f"model_{station}.keras"
+        pipeline_path = MODELS_DIR / f"pipeline_{station}.pkl"
+        metrics_path = REPORTS_DIR / f"{station}.json"
+
+        debug(f"Saving model to {model_path}")
+        model_full.save(model_path)
+        mlflow.log_artifact(str(model_path))
+        debug(f"Saving preprocessing pipeline to {pipeline_path}")
+        joblib.dump(pipeline, pipeline_path)
+        mlflow.log_artifact(str(pipeline_path))
+        debug(f"Saving metrics to {metrics_path}")
+        metrics_payload = {
             "station": station,
             "target_col": target_col,
             "duration_seconds": round(time.perf_counter() - start_time, 2),
             "test": {"mae": mae, "mse": mse, "rmse": rmse},
             "full": {"mae": mae_full, "mse": mse_full, "rmse": rmse_full},
-        },
-    )
-    debug(f"Training completed in {round(time.perf_counter() - start_time, 2)} seconds")
+        }
+        _save_metrics(metrics_path, metrics_payload)
+        mlflow.log_artifact(str(metrics_path))
+        debug(f"Training completed in {round(time.perf_counter() - start_time, 2)} seconds")
 
 
 if __name__ == "__main__":

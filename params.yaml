@@ -4,6 +4,10 @@ fetch:
 preprocess:
   station: "all"
 
+experiment_tracking:
+  tracking_uri: "https://dagshub.com/KvarticJan/IIS_2026.mlflow"
+  experiment_name: "IIS_2026_train"
+
 train:
   station: "E410"
   test_size: 24

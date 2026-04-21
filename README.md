@@ -48,6 +48,27 @@ Za ucenje modela:
 uv run python src/model/train.py
 ```
 
+## Sledenje eksperimentom
+
+Projekt podpira sledenje eksperimentom z MLflow.
+
+- Lokalno se brez dodatnih nastavitev belezenje shrani v mapo `mlruns/`.
+- Na GitHub workflowu se belezenje poslje na DagsHub MLflow endpoint `https://dagshub.com/KvarticJan/IIS_2026.mlflow`.
+
+Za lokalni oddaljeni MLflow zagon po potrebi nastavis:
+
+```powershell
+$env:MLFLOW_TRACKING_URI="https://dagshub.com/KvarticJan/IIS_2026.mlflow"
+$env:MLFLOW_TRACKING_USERNAME="KvarticJan"
+$env:MLFLOW_TRACKING_PASSWORD="<tvoj_dagshub_token>"
+uv run python src/model/train.py
+```
+
+Za GitHub Actions dodaj secreta:
+
+- `MLFLOW_TRACKING_USERNAME`
+- `MLFLOW_TRACKING_PASSWORD`
+
 ## Struktura
 
 - `data/raw/air/air_data.xml`: surovi XML podatki iz ARSO

@@ -50,6 +50,8 @@ stages:
       - data/reference/air
       - gx/uncommitted
     params:
+      - experiment_tracking.tracking_uri
+      - experiment_tracking.experiment_name
       - train.station
       - train.test_size
       - train.random_state
