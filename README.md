@@ -13,13 +13,13 @@ python -m uv sync
 Za zajem svezih podatkov:
 
 ```powershell
-python -m uv run python src/data/fetch_air_data.py
+uv run python src/data/fetch_air_data.py
 ```
 
 Za predprocesiranje podatkov za vse merilne postaje:
 
 ```powershell
-python -m uv run python src/data/preprocess_air_data.py
+uv run python src/data/preprocess_air_data.py
 ```
 
 Za validacijo podatkov z Great Expectations:
@@ -32,21 +32,21 @@ Set-Location gx
 Za testiranje podatkov z Evidently:
 
 ```powershell
-python -m uv run python src/data/test_data.py
+uv run python src/data/test_data.py
 ```
 
 Za namensko osvezitev Evidently referenc, ce se je baseline legitimno spremenil:
 
 ```powershell
 $env:EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE="1"
-python -m uv run python src/data/test_data.py
+uv run python src/data/test_data.py
 Remove-Item Env:EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE
 ```
 
 Za ucenje modela:
 
 ```powershell
-python -m uv run python src/model/train.py
+uv run python src/model/train.py
 ```
 
 ## Struktura

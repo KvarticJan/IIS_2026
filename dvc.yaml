@@ -1,6 +1,6 @@
 stages:
   fetch:
-    cmd: python -m uv run python src/data/fetch_air_data.py
+    cmd: uv run python src/data/fetch_air_data.py
     deps:
       - src/data/fetch_air_data.py
     params:
@@ -10,7 +10,7 @@ stages:
     always_changed: true
 
   preprocess:
-    cmd: python -m uv run python src/data/preprocess_air_data.py
+    cmd: uv run python src/data/preprocess_air_data.py
     deps:
       - src/data/preprocess_air_data.py
       - data/raw/air/air_data.xml
@@ -31,7 +31,7 @@ stages:
           persist: true
 
   test_data:
-    cmd: python -m uv run python src/data/test_data.py
+    cmd: uv run python src/data/test_data.py
     deps:
       - src/data/test_data.py
       - data/preprocessed/air
@@ -42,7 +42,7 @@ stages:
           persist: true
 
   train:
-    cmd: python -m uv run python src/model/train.py
+    cmd: uv run python src/model/train.py
     deps:
       - src/model/preprocess.py
       - src/model/train.py
