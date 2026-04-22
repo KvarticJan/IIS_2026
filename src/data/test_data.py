@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 from evidently import Report
+import yaml
 
 try:
     from evidently.presets import DataDriftPreset, DataSummaryPreset
@@ -17,6 +18,13 @@ PREPROCESSED_DIR = Path("data/preprocessed/air")
 REFERENCE_DIR = Path("data/reference/air")
 REPORTS_DIR = Path("reports/data_testing")
 REFRESH_ON_FAILURE = os.getenv("EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE", "").strip().lower() in {"1", "true", "yes"}
+PARAMS_PATH = Path("params.yaml")
+
+
+def _load_compare_window() -> int:
+    config = yaml.safe_load(PARAMS_PATH.read_text(encoding="utf-8")) or {}
+    testing_config = config.get("data_testing", {})
+    return int(testing_config.get("compare_window_rows", 168))
 
 
 def _collect_test_statuses(payload: object) -> list[str]:
@@ -38,9 +46,11 @@ def test_data() -> int:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
     failures: list[str] = []
+    compare_window = _load_compare_window()
 
     if REFRESH_ON_FAILURE:
         print("Reference refresh mode is enabled for failed Evidently checks.")
+    print(f"Comparing the most recent {compare_window} rows for Evidently drift checks.")
 
     for current_path in sorted(PREPROCESSED_DIR.glob("*.csv")):
         station = current_path.stem
@@ -53,6 +63,11 @@ def test_data() -> int:
             shutil.copy2(current_path, reference_path)
 
         reference = pd.read_csv(reference_path)
+
+        if "date_to" in current.columns:
+            current = current.sort_values("date_to").tail(compare_window).reset_index(drop=True)
+        if "date_to" in reference.columns:
+            reference = reference.sort_values("date_to").tail(compare_window).reset_index(drop=True)
 
         comparable_reference = reference.drop(columns=["date_to"], errors="ignore")
         comparable_current = current.drop(columns=["date_to"], errors="ignore")

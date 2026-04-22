@@ -34,6 +34,8 @@ Za testiranje podatkov z Evidently:
 uv run python src/data/test_data.py
 ```
 
+Evidently primerja zadnje `data_testing.compare_window_rows` vrstice iz `params.yaml`, da dnevni prirast zgodovine ne povzroca laznih alarmov na celotnem arhivu.
+
 Za namensko osvezitev Evidently referenc, ce se je baseline legitimno spremenil:
 
 ```powershell
