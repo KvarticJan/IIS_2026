@@ -51,9 +51,14 @@ jobs:
           dvc pull
 
       - name: Run DVC data pipeline
-        env:
-          EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE: ${{ inputs.refresh_reference == 'true' && '1' || '0' }}
-        run: dvc repro fetch preprocess validate test_data
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.refresh_reference }}" = "true" ]; then
+            export EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE=1
+            echo "Evidently reference refresh is enabled for this run."
+          else
+            echo "Evidently reference refresh is disabled for this run."
+          fi
+          dvc repro fetch preprocess validate test_data
 
       - name: Push DVC artifacts
         run: dvc push

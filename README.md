@@ -71,6 +71,12 @@ Za GitHub Actions dodaj secreta:
 - `MLFLOW_TRACKING_USERNAME`
 - `MLFLOW_TRACKING_PASSWORD`
 
+## GitHub Actions nacin validacije
+
+Scheduled `Fetch data on schedule` zagon samodejno osvezi Evidently reference, ce drift pade, ker je namenjen rednemu premikanju podatkovnega baseline-a.
+
+Rocni `Run workflow` zagon je privzeto strog. `refresh_reference = true` izberi samo takrat, ko zelis novo stanje podatkov sprejeti kot novo referenco.
+
 ## Struktura
 
 - `data/raw/air/air_data.xml`: surovi XML podatki iz ARSO
