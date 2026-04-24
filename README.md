@@ -77,6 +77,8 @@ Scheduled `Fetch data on schedule` zagon samodejno osvezi Evidently reference, c
 
 Rocni `Run workflow` zagon je privzeto strog. `refresh_reference = true` izberi samo takrat, ko zelis novo stanje podatkov sprejeti kot novo referenco.
 
+Workflow `Train model` se zazene samo po uspesno zakljucenem workflowu `Fetch data on schedule`.
+
 ## Struktura
 
 - `data/raw/air/air_data.xml`: surovi XML podatki iz ARSO
