@@ -14,15 +14,15 @@ stages:
     outs:
     - path: data/raw/air/air_data.xml
       hash: md5
-      md5: 980bb7b2a260efe710a0454b594cc2ca
-      size: 1170256
+      md5: 406ab354339c4c3da8d2fb3bea6d609e
+      size: 1170021
   preprocess:
     cmd: uv run python src/data/preprocess_air_data.py
     deps:
     - path: data/raw/air/air_data.xml
       hash: md5
-      md5: 980bb7b2a260efe710a0454b594cc2ca
-      size: 1170256
+      md5: 406ab354339c4c3da8d2fb3bea6d609e
+      size: 1170021
     - path: src/data/preprocess_air_data.py
       hash: md5
       md5: db7ed045e76a00825cc334c14d8b1fc8
@@ -33,16 +33,16 @@ stages:
     outs:
     - path: data/preprocessed/air
       hash: md5
-      md5: 16cc8edafbbe28e57f5c52bcb47d40ab.dir
-      size: 231247
+      md5: 806bca2d93ab76f66c4ea144b5cdc95e.dir
+      size: 244745
       nfiles: 23
   validate:
     cmd: uv run python gx/run_checkpoint.py
     deps:
     - path: data/preprocessed/air
       hash: md5
-      md5: 16cc8edafbbe28e57f5c52bcb47d40ab.dir
-      size: 231247
+      md5: 806bca2d93ab76f66c4ea144b5cdc95e.dir
+      size: 244745
       nfiles: 23
     - path: gx/great_expectations.yml
       hash: md5
@@ -55,16 +55,16 @@ stages:
     outs:
     - path: gx/uncommitted
       hash: md5
-      md5: 09eb1620c7ca4be062bf2f7a36d3aa81.dir
-      size: 12128857
-      nfiles: 300
+      md5: 8ebcf5b31588510010ef8d6d4c0291c0.dir
+      size: 13461278
+      nfiles: 346
   test_data:
     cmd: uv run python src/data/test_data.py
     deps:
     - path: data/preprocessed/air
       hash: md5
-      md5: 16cc8edafbbe28e57f5c52bcb47d40ab.dir
-      size: 231247
+      md5: 806bca2d93ab76f66c4ea144b5cdc95e.dir
+      size: 244745
       nfiles: 23
     - path: src/data/test_data.py
       hash: md5
@@ -76,13 +76,13 @@ stages:
     outs:
     - path: data/reference/air
       hash: md5
-      md5: 16cc8edafbbe28e57f5c52bcb47d40ab.dir
-      size: 231247
+      md5: 806bca2d93ab76f66c4ea144b5cdc95e.dir
+      size: 244745
       nfiles: 23
     - path: reports/data_testing
       hash: md5
-      md5: bbe761bb77a7ffa1ceb447a25facd53e.dir
-      size: 79771722
+      md5: b3be133f8885b66f703c2bd9f73c4c18.dir
+      size: 79785158
       nfiles: 23
   train:
     cmd: uv run python src/model/train.py
