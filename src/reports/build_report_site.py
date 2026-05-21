@@ -1,10 +1,12 @@
+import os
 import shutil
+import stat
 from pathlib import Path
 
 
 GX_SITE_DIR = Path("gx/uncommitted/data_docs/local_site")
 EVIDENTLY_REPORTS_DIR = Path("reports/data_testing")
-OUTPUT_DIR = Path("reports/site")
+OUTPUT_DIR = Path(os.getenv("REPORT_SITE_DIR", "reports/site"))
 
 
 def _copy_gx_reports() -> None:
@@ -133,9 +135,14 @@ def _write_index(evidently_reports: list[Path]) -> None:
     (OUTPUT_DIR / "index.html").write_text(index_html, encoding="utf-8")
 
 
+def _handle_remove_readonly(function, path, _exc_info) -> None:
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
+
+
 def build_report_site() -> None:
     if OUTPUT_DIR.exists():
-        shutil.rmtree(OUTPUT_DIR)
+        shutil.rmtree(OUTPUT_DIR, onerror=_handle_remove_readonly)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     _copy_gx_reports()
