@@ -1,6 +1,13 @@
 name: Train model
 
 on:
+  workflow_dispatch:
+    inputs:
+      train_station:
+        description: "Station to train, e.g. E410 or all"
+        required: true
+        default: "E410"
+        type: string
   workflow_run:
     workflows: ["Fetch data on schedule"]
     types:
@@ -12,7 +19,7 @@ permissions:
 jobs:
   train_model:
     name: Train air quality model
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -48,6 +55,7 @@ jobs:
         env:
           MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+          TRAIN_STATION: ${{ github.event.inputs.train_station || 'E410' }}
         run: |
           if [ -n "${MLFLOW_TRACKING_USERNAME}" ] && [ -n "${MLFLOW_TRACKING_PASSWORD}" ]; then
             export MLFLOW_TRACKING_URI="https://dagshub.com/KvarticJan/IIS_2026.mlflow"
@@ -55,6 +63,7 @@ jobs:
           else
             echo "MLflow secrets are missing. Falling back to local tracking."
           fi
+          echo "Training station selection: ${TRAIN_STATION}"
           dvc repro --single-item train
 
       - name: Push DVC artifacts

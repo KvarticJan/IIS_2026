@@ -46,7 +46,7 @@ def build_model(input_shape: tuple[int, int]) -> Sequential:
     model.add(LSTM(16, return_sequences=False))
     model.add(Dropout(0.2))
     model.add(Dense(1))
-    model.compile(optimizer="adam", loss="mean_squared_error", run_eagerly=True)
+    model.compile(optimizer="adam", loss="mean_squared_error")
     return model
 
 

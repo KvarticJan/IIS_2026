@@ -94,7 +94,7 @@ Scheduled `Fetch data on schedule` zagon samodejno osvezi Evidently reference, c
 
 Rocni `Run workflow` zagon je privzeto strog. `refresh_reference = true` izberi samo takrat, ko zelis novo stanje podatkov sprejeti kot novo referenco.
 
-Workflow `Train model` se zazene samo po uspesno zakljucenem workflowu `Fetch data on schedule`.
+Workflow `Train model` se zazene po uspesno zakljucenem workflowu `Fetch data on schedule` in za dnevni CI privzeto trenira demonstracijsko postajo `E410`, da scheduled zagon ne traja predolgo. Rocno ga lahko zazenes tudi z `train_station = all`, s cimer preveris zahtevo, da modelna skripta deluje za vsa merilna mesta.
 
 ## Objavljena porocila
 
