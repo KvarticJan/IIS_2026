@@ -12,7 +12,7 @@ data_testing:
   compare_window_rows: 168
 
 train:
-  station: "E410"
+  station: "all"
   test_size: 24
   random_state: 42
   window_size: 24

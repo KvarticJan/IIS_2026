@@ -50,6 +50,23 @@ Za ucenje modela:
 uv run python src/model/train.py
 ```
 
+Privzeto se zaradi `train.station: "all"` v `params.yaml` modeli naucijo za vsa merilna mesta, ki imajo dovolj veljavnih `PM10` vrednosti. Merilna mesta brez uporabnih ciljnih vrednosti se zabelezijo kot preskocena v `reports/model_training/summary.json`.
+
+Za hiter lokalni test ene postaje lahko uporabis:
+
+```powershell
+$env:TRAIN_STATION="E410"
+uv run python src/model/train.py
+Remove-Item Env:TRAIN_STATION
+```
+
+Trening shrani:
+
+- `models/model_<postaja>.keras`
+- `models/model_<postaja>.onnx`
+- `models/pipeline_<postaja>.pkl`
+- `reports/model_training/<postaja>.json`
+
 ## Sledenje eksperimentom
 
 Projekt podpira sledenje eksperimentom z MLflow.
@@ -79,6 +96,28 @@ Rocni `Run workflow` zagon je privzeto strog. `refresh_reference = true` izberi 
 
 Workflow `Train model` se zazene samo po uspesno zakljucenem workflowu `Fetch data on schedule`.
 
+## Objavljena porocila
+
+Workflow `Fetch data on schedule` po uspesnem podatkovnem cevovodu zgradi staticki portal `reports/site`, ki zdruzi:
+
+- Great Expectations Data Docs iz `gx/uncommitted/data_docs/local_site`
+- Evidently HTML porocila iz `reports/data_testing`
+
+Za samodejno objavo na Netlify dodaj GitHub Actions secreta:
+
+- `NETLIFY_AUTH_TOKEN`
+- `NETLIFY_SITE_ID`
+
+Priporocen postopek:
+
+1. V Netlify ustvari nov site, npr. `iis-2026-reports`.
+2. V Netlify odpri `User settings` -> `Applications` -> `Personal access tokens` in ustvari token.
+3. V Netlify site nastavitvah kopiraj `Site ID`.
+4. V GitHub repozitoriju odpri `Settings` -> `Secrets and variables` -> `Actions` in dodaj oba secreta.
+5. Rocno zazeni workflow `Fetch data on schedule`; po uspesnem zagonu mora Netlify prikazati portal z GX in Evidently porocili.
+
+Ce secreta nista nastavljena, se deploy preskoci, podatkovni DVC pipeline pa se vedno ostane uporaben.
+
 ## Struktura
 
 - `data/raw/air/air_data.xml`: surovi XML podatki iz ARSO
@@ -86,7 +125,7 @@ Workflow `Train model` se zazene samo po uspesno zakljucenem workflowu `Fetch da
 - `data/reference/air/*.csv`: referencni podatki za Evidently drift teste
 - `gx/`: Great Expectations kontekst, expectation suite-i in data docs
 - `models/`: nauceni modeli in serializirani preprocessing pipeline-i
-- `reports/`: Evidently in model evaluation porocila
+- `reports/`: Evidently, Netlify in model evaluation porocila
 - `src/data/`: skripte za zajem, obdelavo, validacijo in testiranje podatkov
 - `src/model/`: skripte za pripravo casovnih oken in ucenje modela
 - `.github/workflows/`: GitHub Actions poteki dela
@@ -99,7 +138,7 @@ Projekt uporablja DVC pipeline:
 - `preprocess`: priprava CSV datotek za vse merilne postaje
 - `validate`: Great Expectations validacija
 - `test_data`: Evidently drift testiranje
-- `train`: ucenje LSTM modela za izbrano postajo
+- `train`: ucenje LSTM modelov in ONNX izvoz za izbrana merilna mesta
 
 Za zagon celotnega cevovoda:
 

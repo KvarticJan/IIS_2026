@@ -19,6 +19,7 @@ os.environ.setdefault("TF_ENABLE_ONEDNN_OPTS", "0")
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
 
 import tensorflow as tf
+import tf2onnx
 from tensorflow.keras.callbacks import EarlyStopping, LambdaCallback
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 from tensorflow.keras.models import Sequential
@@ -53,7 +54,7 @@ def _load_params() -> dict:
     return yaml.safe_load(PARAMS_PATH.read_text(encoding="utf-8"))
 
 
-def _configure_mlflow(config: dict, station: str) -> bool:
+def _configure_mlflow(config: dict) -> bool:
     tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "").strip()
     username = os.getenv("MLFLOW_TRACKING_USERNAME", "").strip()
     password = os.getenv("MLFLOW_TRACKING_PASSWORD", "").strip()
@@ -105,12 +106,37 @@ def _save_metrics(metrics_path: Path, metrics: dict) -> None:
     metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
 
 
-def train_model() -> None:
-    start_time = time.perf_counter()
-    debug("Loading training parameters")
-    config = _load_params()
+def _resolve_stations(station_config: str | list[str]) -> list[str]:
+    if isinstance(station_config, list):
+        requested = [str(station).strip() for station in station_config]
+    else:
+        station_value = str(station_config).strip()
+        if station_value.lower() == "all":
+            return sorted(path.stem for path in PREPROCESSED_DIR.glob("*.csv"))
+        requested = [station.strip() for station in station_value.split(",")]
+
+    return [station for station in requested if station]
+
+
+def _export_onnx_model(model: Sequential, input_shape: tuple[int, int], onnx_path: Path) -> None:
+    debug(f"Saving ONNX model to {onnx_path}")
+    onnx_path.parent.mkdir(parents=True, exist_ok=True)
+    input_signature = (tf.TensorSpec((None, input_shape[0], input_shape[1]), tf.float32, name="input"),)
+
+    if not hasattr(model, "output_names"):
+        model.output_names = ["output"]
+
+    tf2onnx.convert.from_keras(
+        model,
+        input_signature=input_signature,
+        opset=13,
+        output_path=str(onnx_path),
+    )
+
+
+def _train_station(config: dict, station: str, uses_remote_mlflow: bool) -> dict:
+    station_start = time.perf_counter()
     params = config["train"]
-    station = params["station"]
     test_size = int(params["test_size"])
     random_state = int(params["random_state"])
     window_size = int(params["window_size"])
@@ -119,20 +145,6 @@ def train_model() -> None:
     batch_size = int(params["batch_size"])
     validation_split = float(params["validation_split"])
     patience = int(params["patience"])
-
-    debug("Setting reproducibility configuration")
-    os.environ["PYTHONHASHSEED"] = str(random_state)
-    random.seed(random_state)
-    np.random.seed(random_state)
-    tf.keras.utils.set_random_seed(random_state)
-    tf.config.threading.set_inter_op_parallelism_threads(1)
-    tf.config.threading.set_intra_op_parallelism_threads(1)
-
-    debug("Ensuring output directories exist")
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    MLRUNS_DIR.mkdir(parents=True, exist_ok=True)
-    uses_remote_mlflow = _configure_mlflow(config, station)
 
     with mlflow.start_run(run_name=f"train_{station}"):
         mlflow.log_params(
@@ -152,8 +164,21 @@ def train_model() -> None:
 
         dataset_path = PREPROCESSED_DIR / f"{station}.csv"
         debug(f"Loading dataset from {dataset_path}")
+        if not dataset_path.exists():
+            raise ValueError(f"Dataset for {station} does not exist: {dataset_path}")
+
         df = pd.read_csv(dataset_path)
+        if target_col not in df.columns:
+            raise ValueError(f"Dataset for {station} does not contain target column {target_col}.")
+
         df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
+        minimum_rows = window_size + test_size + 1
+        valid_target_rows = int(df[target_col].notna().sum())
+        if valid_target_rows < minimum_rows:
+            raise ValueError(
+                f"Dataset for {station} has too few valid {target_col} values. "
+                f"Need at least {minimum_rows}, got {valid_target_rows}."
+            )
 
         debug("Applying date preprocessing and hourly alignment")
         date_preprocessor = DatePreprocessor("date_to")
@@ -161,7 +186,6 @@ def train_model() -> None:
         debug(f"Dataset shape after date preprocessing: {df.shape}")
         mlflow.log_metric("dataset_rows", float(len(df)))
 
-        minimum_rows = window_size + test_size + 1
         if len(df) < minimum_rows:
             raise ValueError(
                 f"Dataset for {station} is too small for training. Need at least {minimum_rows} rows, got {len(df)}."
@@ -260,12 +284,15 @@ def train_model() -> None:
         mlflow.log_metric("full_rmse", rmse_full)
 
         model_path = MODELS_DIR / f"model_{station}.keras"
+        onnx_path = MODELS_DIR / f"model_{station}.onnx"
         pipeline_path = MODELS_DIR / f"pipeline_{station}.pkl"
         metrics_path = REPORTS_DIR / f"{station}.json"
 
         debug(f"Saving model to {model_path}")
         model_full.save(model_path)
         mlflow.log_artifact(str(model_path))
+        _export_onnx_model(model_full, (X_full.shape[1], X_full.shape[2]), onnx_path)
+        mlflow.log_artifact(str(onnx_path))
         debug(f"Saving preprocessing pipeline to {pipeline_path}")
         joblib.dump(pipeline, pipeline_path)
         mlflow.log_artifact(str(pipeline_path))
@@ -273,13 +300,78 @@ def train_model() -> None:
         metrics_payload = {
             "station": station,
             "target_col": target_col,
-            "duration_seconds": round(time.perf_counter() - start_time, 2),
+            "duration_seconds": round(time.perf_counter() - station_start, 2),
+            "model_path": str(model_path),
+            "onnx_path": str(onnx_path),
+            "pipeline_path": str(pipeline_path),
             "test": {"mae": mae, "mse": mse, "rmse": rmse},
             "full": {"mae": mae_full, "mse": mse_full, "rmse": rmse_full},
         }
         _save_metrics(metrics_path, metrics_payload)
         mlflow.log_artifact(str(metrics_path))
-        debug(f"Training completed in {round(time.perf_counter() - start_time, 2)} seconds")
+        debug(f"Training for {station} completed in {round(time.perf_counter() - station_start, 2)} seconds")
+        tf.keras.backend.clear_session()
+        return metrics_payload
+
+
+def train_model() -> None:
+    start_time = time.perf_counter()
+    debug("Loading training parameters")
+    config = _load_params()
+    params = config["train"]
+    station_config = os.getenv("TRAIN_STATION", params["station"])
+    stations = _resolve_stations(station_config)
+    if not stations:
+        raise ValueError("No stations selected for training.")
+
+    random_state = int(params["random_state"])
+
+    debug("Setting reproducibility configuration")
+    os.environ["PYTHONHASHSEED"] = str(random_state)
+    random.seed(random_state)
+    np.random.seed(random_state)
+    tf.keras.utils.set_random_seed(random_state)
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+    tf.config.threading.set_intra_op_parallelism_threads(1)
+
+    debug("Ensuring output directories exist")
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    MLRUNS_DIR.mkdir(parents=True, exist_ok=True)
+    uses_remote_mlflow = _configure_mlflow(config)
+
+    summary = {
+        "requested_station": station_config,
+        "duration_seconds": None,
+        "trained": [],
+        "skipped": [],
+        "failed": [],
+    }
+
+    debug(f"Training selected stations: {', '.join(stations)}")
+    for station in stations:
+        try:
+            summary["trained"].append(_train_station(config, station, uses_remote_mlflow))
+        except ValueError as exc:
+            debug(f"Skipping {station}: {exc}")
+            summary["skipped"].append({"station": station, "reason": str(exc)})
+        except Exception as exc:
+            debug(f"Training failed for {station}: {exc}")
+            summary["failed"].append({"station": station, "reason": str(exc)})
+
+    summary["duration_seconds"] = round(time.perf_counter() - start_time, 2)
+    summary_path = REPORTS_DIR / "summary.json"
+    debug(f"Saving training summary to {summary_path}")
+    _save_metrics(summary_path, summary)
+
+    if not summary["trained"]:
+        raise RuntimeError("No station models were trained successfully.")
+
+    if summary["failed"]:
+        failed_stations = ", ".join(item["station"] for item in summary["failed"])
+        raise RuntimeError(f"Training failed for stations: {failed_stations}")
+
+    debug(f"Training completed in {summary['duration_seconds']} seconds")
 
 
 if __name__ == "__main__":

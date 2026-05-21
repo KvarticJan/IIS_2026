@@ -19,6 +19,7 @@ dependencies = [
     "requests>=2.33.1",
     "scikit-learn<2",
     "tensorflow>=2.19.0,<3.0.0",
+    "tf2onnx>=1.16.1,<2.0.0",
 ]
 
 [project.scripts]

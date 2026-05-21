@@ -104,22 +104,22 @@ stages:
       nfiles: 1496
     - path: src/model/preprocess.py
       hash: md5
-      md5: 484f66f5642fe83bd3f79f34326cfd1a
-      size: 1369
+      md5: 7d5c556b113b9ca3fa4d4f1de4bf4e99
+      size: 1409
     - path: src/model/train.py
       hash: md5
-      md5: ac887e6949780918fcca65d674800259
-      size: 11186
+      md5: 21a8df71972334a9983411e6383ca57b
+      size: 15090
     params:
       params.yaml:
         experiment_tracking.experiment_name: IIS_2026_train
-        experiment_tracking.tracking_uri: 
+        experiment_tracking.tracking_uri:
           https://dagshub.com/KvarticJan/IIS_2026.mlflow
         train.batch_size: 16
         train.epochs: 8
         train.patience: 2
         train.random_state: 42
-        train.station: E410
+        train.station: all
         train.target_col: PM10
         train.test_size: 24
         train.validation_split: 0.2
@@ -127,11 +127,11 @@ stages:
     outs:
     - path: models
       hash: md5
-      md5: 6f941015af9f1cbb202d57ed93d8f87c.dir
-      size: 42782
-      nfiles: 2
+      md5: 208d4f8bf54f36f294aa7f3bcb807f1a.dir
+      size: 1053527
+      nfiles: 63
     - path: reports/model_training
       hash: md5
-      md5: 0df4551fbdbea5b6a4f775458e289ae5.dir
-      size: 293
-      nfiles: 1
+      md5: 436b4b604c2218b1066d89ebcfe8f15e.dir
+      size: 20573
+      nfiles: 22

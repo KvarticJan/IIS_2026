@@ -63,6 +63,30 @@ jobs:
       - name: Push DVC artifacts
         run: dvc push
 
+      - name: Build report site
+        run: uv run python src/reports/build_report_site.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Deploy reports to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "${NETLIFY_AUTH_TOKEN}" ] || [ -z "${NETLIFY_SITE_ID}" ]; then
+            echo "Missing NETLIFY_AUTH_TOKEN or NETLIFY_SITE_ID. Skipping Netlify deploy."
+            exit 0
+          fi
+          npx --yes netlify-cli@latest deploy \
+            --prod \
+            --dir=reports/site \
+            --site "${NETLIFY_SITE_ID}" \
+            --auth "${NETLIFY_AUTH_TOKEN}" \
+            --message "Publish IIS validation reports from GitHub Actions"
+
       - name: Commit data changes
         run: |
           git config --local user.email "actions@github.com"
