@@ -14,15 +14,15 @@ stages:
     outs:
     - path: data/raw/air/air_data.xml
       hash: md5
-      md5: d3c0c342e77aec12f65465b5361946ce
-      size: 1170051
+      md5: 6f262a7ae23aaa197600d42faa7cb2d5
+      size: 1169797
   preprocess:
     cmd: uv run python src/data/preprocess_air_data.py
     deps:
     - path: data/raw/air/air_data.xml
       hash: md5
-      md5: d3c0c342e77aec12f65465b5361946ce
-      size: 1170051
+      md5: 6f262a7ae23aaa197600d42faa7cb2d5
+      size: 1169797
     - path: src/data/preprocess_air_data.py
       hash: md5
       md5: db7ed045e76a00825cc334c14d8b1fc8
@@ -33,16 +33,16 @@ stages:
     outs:
     - path: data/preprocessed/air
       hash: md5
-      md5: 53d074dda486ae390ae8e28c18972835.dir
-      size: 609605
+      md5: 83159e10a63f0e35428a7602435f91f0.dir
+      size: 623239
       nfiles: 23
   validate:
     cmd: uv run python gx/run_checkpoint.py
     deps:
     - path: data/preprocessed/air
       hash: md5
-      md5: 53d074dda486ae390ae8e28c18972835.dir
-      size: 609605
+      md5: 83159e10a63f0e35428a7602435f91f0.dir
+      size: 623239
       nfiles: 23
     - path: gx/great_expectations.yml
       hash: md5
@@ -55,16 +55,16 @@ stages:
     outs:
     - path: gx/uncommitted
       hash: md5
-      md5: 9e433f0aeac2e3306a970be932134f42.dir
-      size: 46773301
-      nfiles: 1496
+      md5: aee43c9433fdc34ff4e0e8b525003c30.dir
+      size: 48105954
+      nfiles: 1542
   test_data:
     cmd: uv run python src/data/test_data.py
     deps:
     - path: data/preprocessed/air
       hash: md5
-      md5: 53d074dda486ae390ae8e28c18972835.dir
-      size: 609605
+      md5: 83159e10a63f0e35428a7602435f91f0.dir
+      size: 623239
       nfiles: 23
     - path: src/data/test_data.py
       hash: md5
@@ -76,13 +76,13 @@ stages:
     outs:
     - path: data/reference/air
       hash: md5
-      md5: 53d074dda486ae390ae8e28c18972835.dir
-      size: 609605
+      md5: 83159e10a63f0e35428a7602435f91f0.dir
+      size: 623239
       nfiles: 23
     - path: reports/data_testing
       hash: md5
-      md5: 220ffe693c72ce690b8a2596d0520b22.dir
-      size: 79750191
+      md5: c4f890cfbc31fc7adad101b7e7b4efdc.dir
+      size: 79757023
       nfiles: 23
   train:
     cmd: uv run python src/model/train.py
@@ -113,7 +113,7 @@ stages:
     params:
       params.yaml:
         experiment_tracking.experiment_name: IIS_2026_train
-        experiment_tracking.tracking_uri:
+        experiment_tracking.tracking_uri: 
           https://dagshub.com/KvarticJan/IIS_2026.mlflow
         train.batch_size: 16
         train.epochs: 8
