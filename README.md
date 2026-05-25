@@ -103,20 +103,25 @@ Workflow `Fetch data on schedule` po uspesnem podatkovnem cevovodu zgradi static
 - Great Expectations Data Docs iz `gx/uncommitted/data_docs/local_site`
 - Evidently HTML porocila iz `reports/data_testing`
 
-Za samodejno objavo na Netlify dodaj GitHub Actions secreta:
+Portal je objavljen na:
+
+- https://iis2026.netlify.app
+
+Netlify site je `iis2026`, njegov `site_id` pa je ze nastavljen v GitHub workflowu:
+
+- `792b62f5-56d0-4b4a-9dd0-4fd88b303300`
+
+Za samodejno objavo iz GitHub Actions dodaj samo se GitHub Actions secret:
 
 - `NETLIFY_AUTH_TOKEN`
-- `NETLIFY_SITE_ID`
 
-Priporocen postopek:
+Priporocen postopek za token:
 
-1. V Netlify ustvari nov site, npr. `iis-2026-reports`.
-2. V Netlify odpri `User settings` -> `Applications` -> `Personal access tokens` in ustvari token.
-3. V Netlify site nastavitvah kopiraj `Site ID`.
-4. V GitHub repozitoriju odpri `Settings` -> `Secrets and variables` -> `Actions` in dodaj oba secreta.
-5. Rocno zazeni workflow `Fetch data on schedule`; po uspesnem zagonu mora Netlify prikazati portal z GX in Evidently porocili.
+1. V Netlify odpri `User settings` -> `Applications` -> `Personal access tokens` in ustvari token.
+2. V GitHub repozitoriju odpri `Settings` -> `Secrets and variables` -> `Actions` in dodaj secret `NETLIFY_AUTH_TOKEN`.
+3. Rocno zazeni workflow `Fetch data on schedule`; po uspesnem zagonu mora Netlify osveziti portal z GX in Evidently porocili.
 
-Ce secreta nista nastavljena, se deploy preskoci, podatkovni DVC pipeline pa se vedno ostane uporaben.
+Ce secret ni nastavljen, se deploy preskoci, podatkovni DVC pipeline pa se vedno ostane uporaben.
 
 ## Struktura
 

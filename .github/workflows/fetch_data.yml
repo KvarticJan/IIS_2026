@@ -74,10 +74,10 @@ jobs:
       - name: Deploy reports to Netlify
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID || '792b62f5-56d0-4b4a-9dd0-4fd88b303300' }}
         run: |
-          if [ -z "${NETLIFY_AUTH_TOKEN}" ] || [ -z "${NETLIFY_SITE_ID}" ]; then
-            echo "Missing NETLIFY_AUTH_TOKEN or NETLIFY_SITE_ID. Skipping Netlify deploy."
+          if [ -z "${NETLIFY_AUTH_TOKEN}" ]; then
+            echo "Missing NETLIFY_AUTH_TOKEN. Skipping Netlify deploy."
             exit 0
           fi
           npx --yes netlify-cli@latest deploy \

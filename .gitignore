@@ -17,4 +17,5 @@ Thumbs.db
 /reports/data_testing
 /reports/model_training
 /reports/site*
+/deploy-*.zip
 /mlruns
