@@ -127,11 +127,11 @@ stages:
     outs:
     - path: models
       hash: md5
-      md5: 38301feb6cf6fea971d01c50ca144bb4.dir
-      size: 1053523
+      md5: 6770849b5ded5aef1c2f035fc812fadf.dir
+      size: 1053533
       nfiles: 63
     - path: reports/model_training
       hash: md5
-      md5: ed7e7c6f426ca93a76df5bc116fdb244.dir
-      size: 9876
+      md5: 13ec6285bd496f532fce7f06a3390de7.dir
+      size: 9879
       nfiles: 22
