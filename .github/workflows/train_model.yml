@@ -64,7 +64,8 @@ jobs:
             echo "MLflow secrets are missing. Falling back to local tracking."
           fi
           echo "Training station selection: ${TRAIN_STATION}"
-          dvc repro --single-item train
+          echo "Forcing train stage so MLflow receives a run even when DVC outputs are up to date."
+          dvc repro --force --single-item train
 
       - name: Push DVC artifacts
         run: dvc push
