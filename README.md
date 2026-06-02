@@ -90,15 +90,15 @@ Za GitHub Actions dodaj secreta:
 
 ## GitHub Actions nacin validacije
 
-Scheduled `Fetch data on schedule` zagon samodejno osvezi Evidently reference, ce drift pade, ker je namenjen rednemu premikanju podatkovnega baseline-a.
+Workflow `Fetch data manually` se ne zaganja samodejno. Rocni zagon lahko po potrebi osvezi Evidently reference, ce drift pade in zelis trenutno stanje sprejeti kot nov podatkovni baseline.
 
 Rocni `Run workflow` zagon je privzeto strog. `refresh_reference = true` izberi samo takrat, ko zelis novo stanje podatkov sprejeti kot novo referenco.
 
-Workflow `Train model` se zazene po uspesno zakljucenem workflowu `Fetch data on schedule` in za dnevni CI privzeto trenira demonstracijsko postajo `E410`, da scheduled zagon ne traja predolgo. Rocno ga lahko zazenes tudi z `train_station = all`, s cimer preveris zahtevo, da modelna skripta deluje za vsa merilna mesta. Train workflow prisilno izvede DVC stage `train`, zato se MLflow run ustvari tudi takrat, ko so DVC izhodi ze aktualni.
+Workflow `Train model` se zazene po uspesno zakljucenem workflowu `Fetch data manually` in privzeto trenira demonstracijsko postajo `E410`, da zagon ne traja predolgo. Rocno ga lahko zazenes tudi z `train_station = all`, s cimer preveris zahtevo, da modelna skripta deluje za vsa merilna mesta. Train workflow prisilno izvede DVC stage `train`, zato se MLflow run ustvari tudi takrat, ko so DVC izhodi ze aktualni.
 
 ## Objavljena porocila
 
-Workflow `Fetch data on schedule` po uspesnem podatkovnem cevovodu zgradi staticki portal `reports/site`, ki zdruzi:
+Workflow `Fetch data manually` po uspesnem podatkovnem cevovodu zgradi staticki portal `reports/site`, ki zdruzi:
 
 - Great Expectations Data Docs iz `gx/uncommitted/data_docs/local_site`
 - Evidently HTML porocila iz `reports/data_testing`
@@ -119,7 +119,7 @@ Priporocen postopek za token:
 
 1. V Netlify odpri `User settings` -> `Applications` -> `Personal access tokens` in ustvari token.
 2. V GitHub repozitoriju odpri `Settings` -> `Secrets and variables` -> `Actions` in dodaj secret `NETLIFY_AUTH_TOKEN`.
-3. Rocno zazeni workflow `Fetch data on schedule`; po uspesnem zagonu mora Netlify osveziti portal z GX in Evidently porocili.
+3. Rocno zazeni workflow `Fetch data manually`; po uspesnem zagonu mora Netlify osveziti portal z GX in Evidently porocili.
 
 Ce secret ni nastavljen, se deploy preskoci, podatkovni DVC pipeline pa se vedno ostane uporaben.
 

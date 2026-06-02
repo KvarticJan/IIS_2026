@@ -1,4 +1,4 @@
-name: Fetch data on schedule
+name: Fetch data manually
 
 on:
   workflow_dispatch:
@@ -11,8 +11,6 @@ on:
         options:
           - "false"
           - "true"
-  schedule:
-    - cron: "0 0 * * *"
 
 permissions:
   contents: write
@@ -52,7 +50,7 @@ jobs:
 
       - name: Run DVC data pipeline
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.refresh_reference }}" = "true" ]; then
+          if [ "${{ inputs.refresh_reference }}" = "true" ]; then
             export EVIDENTLY_REFRESH_REFERENCE_ON_FAILURE=1
             echo "Evidently reference refresh is enabled for this run."
           else

@@ -9,7 +9,7 @@ on:
         default: "E410"
         type: string
   workflow_run:
-    workflows: ["Fetch data on schedule"]
+    workflows: ["Fetch data manually"]
     types:
       - completed
 
